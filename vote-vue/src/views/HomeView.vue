@@ -1,0 +1,943 @@
+<template>
+  <div>
+    <!-- 流星雨 -->
+    <canvas id="stars"></canvas>
+
+    <!-- 音乐 -->
+    <div class="music-button" :class="{ playing: isMusicPlaying }" @click="toggleMusic">
+      <i class="material-icons">{{ isMusicPlaying ? 'play' : 'pause' }}</i>
+    </div>
+
+    <!-- 标题 -->
+    <span style="float: left; z-index: 999; font-size: xx-large; 
+      position: absolute; left: 700px; top: 8px; color: #f3eeee;">投票广场</span>
+    <i class="el-icon-s-custom" style="float: left; z-index: 999; font-size: xx-large; color: #eae2e2;
+      position: absolute; left: 1230px; top: 30px;" @click="dialogVisiblePassword = true;"></i>
+    <span style="float: left; z-index: 999; font-size: large; 
+      position: absolute; left: 1270px; top: 36px; color: #f3eeee;">欢迎, {{ username }}</span>
+
+
+    <!-- 背景以及导航栏 -->
+    <div id="background"></div>
+    <header id="page-header"><a id="hamburger" href="#sidebar-nav" target="_self"><span class="line"></span><span
+          class="line"></span><span class="line"></span></a></header>
+    <nav id="sidebar-nav">
+      <header id="sidebar-header"><a id="codepen-link" href="https://www.codepen.io/seanfree" target="_blank"></a>
+        <div id="profile-info">
+          <h3 id="profile-name">Sean Free</h3>
+          <h4 id="blurb">Navigation bar</h4>
+        </div><a id="btn-more"><span class="dot"></span><span class="dot"></span><span class="dot"></span></a>
+
+
+        <!-- 导航列表 -->
+        <ul id="sidebar-nav-list">
+          <li class="sidebar-nav-item" id="nav-item-home"
+            style="font-size: x-large; margin-bottom: 20px; width: 300px; height: 65px;border-radius: 10%/50% ;"
+            @click="goHome"><a href="#"><i class="material-icons">投票</i>广场</a>
+          </li>
+          <li class="sidebar-nav-item" id="nav-item-social"
+            style="font-size: x-large; margin-bottom: 20px;width: 300px;height: 65px;border-radius: 10%/50% ;"
+            @click="goMyVote">
+            <a href="#"><i class="material-icons">我的</i>投票</a>
+          </li>
+          <li class="sidebar-nav-item" id="nav-item-mail"
+            style="font-size: x-large; margin-bottom: 20px;width: 300px;height: 65px;border-radius: 10%/50% ;"
+            @click="myParticipate"><a href="#"><i class="material-icons">我的</i>参与</a>
+          </li>
+          <li class="sidebar-nav-item" id="nav-item-pictures"
+            style="font-size: x-large; margin-bottom: 20px;width: 300px;height: 65px;border-radius: 10%/50% ;"
+            @click="myAccount"><a href="#"><i class="material-icons">退出</i>登录</a></li>
+          <li class="sidebar-nav-item" id="nav-item-pictures"
+            style="font-size: x-large;width: 300px;height: 65px;border-radius: 10%/50% ;"><a href="#"><i
+                class="material-icons">关闭</i>导航</a></li>
+        </ul>
+      </header>
+    </nav>
+
+    <!-- 输入框，模糊查询 -->
+    <div>
+      <el-input v-model="input" placeholder="请输入要查询内容" style="position: absolute; 
+      top: 68px; width: 300px; left: 950px;">
+      </el-input>
+      <el-button type="primary" icon="el-icon-search" style="position: absolute; 
+      top: 68px; left: 1260px; width: 100px;" @click="search">搜索</el-button>
+    </div>
+
+
+    <!-- 投票数据生成表格 -->
+    <el-table :data="tableData.slice((currentPage - 1) * pageSize, currentPage * pageSize)" class="table"
+      style="font-size: 20px; text-align: center;" :row-class-name="tableRowClassName">
+      <el-table-column prop="title" label="投票标题" width="500px" class="tableRow">
+      </el-table-column>
+      <el-table-column prop="choice" label="选项" v-if="false" width="500px" class="tableRow">
+      </el-table-column>
+      <el-table-column prop="userId" label="发起者" width="180">
+      </el-table-column>
+      <el-table-column prop="createTime" label="发起时间">
+      </el-table-column>
+      <el-table-column prop="account" label="参与人数">
+      </el-table-column>
+      <el-table-column label="操作" width="250px">
+        <template slot-scope="scope">
+          <el-button type="primary" @click="dialogVisible = true; dataInput(scope.row)">参与投票</el-button>
+          <el-button type="primary" @click="result(scope.row)">查看结果</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 排序按钮 -->
+    <el-button type="primary" icon="el-icon-sort" circle
+      style=" text-align: left; position: absolute; top: 120px; right: 210px; background-color: #50abdf;"
+      @click="sort"></el-button>
+
+
+    <!-- 对表格分页 -->
+    <el-pagination @size-change="handleSizeChange" @current-change="handleCurrentChange" :current-page="currentPage"
+      :page-size="pageSize" layout="total, prev, pager, next, jumper" :total="this.tableData.length"
+      style="position: absolute; left: 510px; top: 690px;" background>
+    </el-pagination>
+
+    <!-- 表单弹出 -->
+    <el-dialog title="投票内容" :visible.sync="dialogVisible" width="30%">
+      <div style="font-size: x-large; text-align: center;position: relative; top: -30px;">{{ choice.title }}</div>
+
+      <el-form ref="form" :model="form" label-width="80px">
+        <el-form-item label="">
+          <el-radio-group v-model="form.number">
+            <el-radio label="1" style="display: block; position: relative; top: -15px;left: -20px;transform:scale(1.15)"
+              id="choice1">{{
+                choice.choice1 }}</el-radio>
+            <el-radio label="2" style="display: block; position: relative;top: 5px;left: -20px;transform:scale(1.15)"
+              id="choice2">{{
+                choice.choice2 }}</el-radio>
+            <el-radio label="3" style="display: block; position: relative;top:25px; left: -20px;transform:scale(1.15)"
+              id="choice3">{{
+                choice.choice3 }}</el-radio>
+            <el-radio label="4" style="display: block;position: relative; left:-18px; top: 45px;transform:scale(1.15)"
+              id="choice4">{{
+                choice.choice4 }}</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="dialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="dialogVisible = false; submit()">确 定</el-button>
+      </span>
+    </el-dialog>
+
+    <!-- 修改密码表单弹出 -->
+    <el-dialog title="投票内容" :visible.sync="dialogVisiblePassword" width="30%">
+      <div style="font-size: x-large; text-align: center;position: relative; top: -30px;">修改密码</div>
+      <el-input placeholder="请输入原有密码" v-model="passwordBefore" show-password></el-input>
+      <el-input placeholder="请输入更改密码" v-model="passwordNew" style="margin-top: 30px;" show-password></el-input>
+      <el-input placeholder="请确认更改密码" v-model="passwordCheck" style="margin-top: 30px;" show-password></el-input>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="dialogVisiblePassword = false">取 消</el-button>
+        <el-button type="primary" @click="dialogVisiblePassword = false; submitPassword()">确 定</el-button>
+      </span>
+    </el-dialog>
+  </div>
+</template>
+  
+<script>
+import axios from 'axios';
+// import * as echarts from "echarts";
+var username = window.sessionStorage.getItem('username');
+var token = window.sessionStorage.getItem('token');
+var orderAlready = false;
+var count1 = 0;
+var count2 = 0;
+var count3 = 0;
+var count4 = 0;
+
+function Choice(title, choice1, choice2, choice3, choice4) {
+  this.title = title;
+  this.choice1 = choice1;
+  this.choice2 = choice2;
+  this.choice3 = choice3;
+  this.choice4 = choice4;
+}
+
+
+export default {
+  methods: {
+
+    // 修改密码
+    submitPassword: function () {
+      if (this.passwordBefore == this.passwordNew) {
+        this.$message({
+          type: 'error',
+          message: '新密码不能与原密码相同，请重新修改！'
+        });
+      } else {
+        if (this.passwordNew == this.passwordCheck) {
+          axios.get("http://localhost:8080/log/modifyPassword", {
+            params: {
+              username: username,
+              passwordBefore: this.passwordBefore,
+              passwordNew: this.passwordNew,
+            }
+          })
+            .then(res => {
+              if (res.data.code == 0) {
+                this.$message({
+                  type: 'error',
+                  message: res.data.msg,
+                })
+              } else {
+                this.$message({
+                  type: 'success',
+                  message: "修改成功!"
+                })
+              }
+
+            })
+        } else {
+          this.$message({
+            type: 'error',
+            message: '请输入相同密码！'
+          })
+        }
+      }
+    },
+
+    //按热度排序
+    sort: function () {
+      if (!orderAlready) {
+        axios.get("http://localhost:8080/vote/sortHot")
+          .then(res => {
+            this.tableData = res.data.data;
+            orderAlready = true;
+          })
+      } else {
+        axios.get("http://localhost:8080/vote")
+          .then(res => {
+            this.tableData = res.data.data;
+            orderAlready = false;
+          });
+      }
+    },
+
+    // 流星雨
+    playMusic() {
+      this.audio.loop = this.isMusicLooping;
+      this.audio.play();
+      this.isMusicPlaying = true;
+    },
+    pauseMusic() {
+      this.audio.pause();
+      this.isMusicPlaying = false;
+    },
+
+    toggleMusic() {
+      if (this.isMusicPlaying) {
+        this.pauseMusic();
+      } else {
+        this.playMusic();
+      }
+    },
+    createStars(context) {
+      const starCount = 800;
+      for (let i = 0; i < starCount; i++) {
+        const star = {
+          x: Math.random() * window.innerWidth,
+          y: 5000 * Math.random(),
+          text: '.',
+          color: '',
+          getColor() {
+            const r = Math.random();
+            if (r < 0.5) {
+              this.color = '#333';
+            } else {
+              this.color = 'white';
+            }
+          },
+          draw() {
+            context.fillStyle = this.color;
+            context.fillText(this.text, this.x, this.y);
+          },
+          init() {
+            this.getColor();
+          },
+        };
+        star.init();
+        star.draw();
+      }
+    },
+    createMeteors(context) {
+      const rainCount = 20;
+      const rains = [];
+
+      class MeteorRain {
+        constructor() {
+          this.x = -1;
+          this.y = -1;
+          this.length = -1;
+          this.angle = 30;
+          this.width = -1;
+          this.height = -1;
+          this.speed = 1;
+          this.offset_x = -1;
+          this.offset_y = -1;
+          this.alpha = 1;
+          this.color1 = '';
+          this.color2 = '';
+
+          this.init();
+        }
+
+        init() {
+          this.getPos();
+          this.alpha = 1;
+          this.getRandomColor();
+          const x = Math.random() * 80 + 150;
+          this.length = Math.ceil(x);
+          this.angle = 30;
+          const speed = Math.random() + 0.5;
+          this.speed = Math.ceil(speed);
+          const cos = Math.cos(this.angle * Math.PI / 180);
+          const sin = Math.sin(this.angle * Math.PI / 180);
+          this.width = this.length * cos;
+          this.height = this.length * sin;
+          this.offset_x = this.speed * cos;
+          this.offset_y = this.speed * sin;
+        }
+
+        getRandomColor() {
+          const a = Math.ceil(255 - 240 * Math.random());
+          this.color1 = `rgba(${a},${a},${a},1)`;
+          this.color2 = 'black';
+        }
+
+        countPos() {
+          this.x = this.x - this.offset_x;
+          this.y = this.y + this.offset_y;
+        }
+
+        getPos() {
+          this.x = Math.random() * window.innerWidth;
+          this.y = Math.random() * window.innerHeight;
+        }
+
+        draw() {
+          context.save();
+          context.beginPath();
+          context.lineWidth = 1;
+          context.globalAlpha = this.alpha;
+          const line = context.createLinearGradient(this.x, this.y, this.x + this.width, this.y - this.height);
+          line.addColorStop(0, 'white');
+          line.addColorStop(0.3, this.color1);
+          line.addColorStop(0.6, this.color2);
+          context.strokeStyle = line;
+          context.moveTo(this.x, this.y);
+          context.lineTo(this.x + this.width, this.y - this.height);
+          context.closePath();
+          context.stroke();
+          context.restore();
+        }
+
+        move() {
+          const x = this.x + this.width - this.offset_x;
+          const y = this.y - this.height;
+          context.clearRect(x - 3, y - 3, this.offset_x + 5, this.offset_y + 5);
+          this.countPos();
+          this.alpha -= 0.002;
+          this.draw();
+        }
+      }
+
+      for (let i = 0; i < rainCount; i++) {
+        const rain = new MeteorRain();
+        rains.push(rain);
+      }
+
+      const playRains = () => {
+        for (let i = 0; i < rainCount; i++) {
+          const rain = rains[i];
+          rain.move();
+          if (rain.y > window.innerHeight) {
+            context.clearRect(rain.x, rain.y - rain.height, rain.width, rain.height);
+            rains[i] = new MeteorRain();
+          }
+        }
+        requestAnimationFrame(playRains);
+      };
+
+      playRains();
+    },
+
+    //表格内颜色
+    tableRowClassName({ rowIndex }) {
+      if (rowIndex % 4 == 0) {
+        return 'warning-row';
+      } else if (rowIndex % 4 === 2) {
+        return 'success-row';
+      }
+      return '';
+    },
+
+    //分页相关
+    handleSizeChange(val) {
+      console.log(`每页 ${val} 条`);
+    },
+    handleCurrentChange(val) {
+      console.log(`当前页: ${val}`);
+      this.currentPage = val;
+
+    },
+
+    //弹出表单置入选项
+    /*
+    title
+    userId
+    createTime
+     */
+    dataInput: function (val) {
+      this.title = val.title;
+      this.userId = val.userId;
+      axios.get("http://localhost:8080/vote/choice", {
+        params: {
+          title: val.title,
+          userId: val.userId,
+        }
+      })
+        .then(res => {
+          this.choices = res.data.data;
+          // alert(this.choices[0]);
+          this.choice = new Choice(val.title, this.choices[0], this.choices[1], this.choices[2], this.choices[3]);
+        })
+    },
+
+    //查看投票结果
+    result: function (val) {
+
+      axios.get("http://localhost:8080/vote/voteAlready", {
+        params: {
+          username: username,
+          title: val.title,
+          creatorId: val.userId,
+        }
+      })
+        .then(res => {
+          if (res.data.code == 1) {
+            //发起请求，获取投票人数
+            axios.get("http://localhost:8080/vote/count", {
+              params: {
+                title: val.title,
+                creatorId: val.userId,
+              }
+            })
+              .then(res => {
+                let strings = res.data.data.split(",");
+
+                count1 = parseInt(strings[0]);
+                count2 = parseInt(strings[1]);
+                count3 = parseInt(strings[2]);
+                count4 = parseInt(strings[3]);
+                window.sessionStorage.setItem("count1", count1);
+                window.sessionStorage.setItem("count2", count2);
+                window.sessionStorage.setItem("count3", count3);
+                window.sessionStorage.setItem("count4", count4);
+                // console.log(count1);
+                // console.log(count2);
+                // console.log(count3);
+                // console.log(count4);
+              })
+            window.sessionStorage.setItem("title", val.title);
+            window.sessionStorage.setItem("choice", val.choice);
+            this.$router.push('result');
+          } else {
+            this.$message({
+              type: 'warning',
+              message: '请先参加投票再查看投票结果',
+            });
+          }
+        })
+    },
+
+    //弹出表单提交
+    submit: function () {
+      axios.get("http://localhost:8080/vote/participate", {
+        params: {
+          username: this.username,
+          number: this.form.number,
+          title: this.title,
+          creatorId: this.userId,
+        }
+      })
+        .then(res => {
+          // console.log(res)
+          if (res.data.code == 1) {
+            this.$message({
+              type: 'success',
+              message: '投票成功!'
+            });
+
+            setTimeout(() => {
+              window.location.reload();
+            }, 800);
+          } else if (res.data.msg == "请勿多次投票") {
+            this.$message({
+              type: 'error',
+              message: '您已参加过该投票，请勿多次参加！'
+            });
+          } else if (res.data.msg == "投票已被暂停") {
+            this.$message({
+              type: 'error',
+              message: '该投票已被暂停!',
+            });
+          }
+        })
+    },
+
+    //导航栏内容跳转
+    goHome: function () {
+      this.$router.push({
+        name: 'home',
+      });
+    },
+
+    //跳转到我的投票
+    goMyVote: function () {
+      this.$router.push({
+        name: 'vote',
+      });
+    },
+
+    //跳转到我的参与
+    myParticipate: function () {
+      this.$router.push('/participate');
+    },
+
+    //跳转到我的账户
+    myAccount: function () {
+      this.$router.push('/log');
+    },
+
+    //模糊查询表格内容
+    search: function () {
+      // alert(this.input);
+      axios.get("http://localhost:8080/vote/search", {
+        params: {
+          content: this.input,
+        }
+      })
+        .then(res => {
+          this.tableData = res.data.data;
+          //location.reload();
+        })
+    },
+  },
+
+  //钩子函数
+  mounted: function () {
+
+    if (location.href.indexOf("#reloaded") == -1) {
+      location.href = location.href + "#reloaded";
+      location.reload();
+      this.drawCharts();
+    }
+    console.log(token);
+    if (token != 1) {
+      this.$message({
+        type: 'error',
+        message: '搞什么飞机？？？，赶紧登录！！！'
+      });
+      this.$router.push('/log');
+    }
+
+    axios.get("http://localhost:8080/vote")
+      .then(res => {
+        this.tableData = res.data.data;
+        console.log(this.tableData);
+      });
+    this.audio = new Audio(require('@/assets/1.mp3'));
+
+    const stars = document.getElementById('stars');
+    const context = stars.getContext('2d');
+
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    stars.width = windowWidth;
+    stars.height = windowHeight;
+
+    this.createStars(context);
+    this.createMeteors(context);
+  },
+  data() {
+    return {
+      tableData: [],
+      input: '',
+      currentPage: 1,
+      pageSize: 8,
+      choice: new Choice(),
+      choices: [],
+      username,
+      title: '',
+      userId: '',
+      // 音乐
+      audio: null,
+      isMusicPlaying: false,
+      isMusicLooping: true,
+      // 修改密码功能信息获取
+      passwordBefore: '',
+      passwordNew: '',
+      passwordCheck: '',
+
+      dialogVisible: false,
+      form: {
+        name: '',
+        number: ''
+      },
+      dialogVisibleResult: false,
+
+      //修改密码表单
+      dialogVisiblePassword: false,
+    }
+  },
+}
+</script>
+<style>
+body {
+  overflow: hidden;
+}
+
+.table {
+  position: absolute;
+  top: 115px;
+  left: 160px;
+  width: 1200px;
+  height: 566px;
+  opacity: 0.85;
+}
+
+
+.el-table .warning-row {
+  background: oldlace;
+}
+
+.el-table .success-row {
+  background: #f0f9eb;
+}
+
+::-moz-selection {
+  background: transparent;
+}
+
+::selection {
+  background: transparent;
+}
+
+a {
+  color: white;
+  text-decoration: none;
+}
+
+#background {
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  background-image: url("../assets/homeBcg.png");
+  background-size: cover;
+  background-position: center center;
+  opacity: 0.95;
+}
+
+#fab {
+  position: fixed;
+  z-index: 1;
+  right: 30px;
+  bottom: 30px;
+  height: 60px;
+  width: 60px;
+  border-radius: 50%;
+  background-color: #f55e22;
+  box-shadow: 0 2px 8px #3f3f3f;
+  text-align: center;
+  line-height: 60px;
+  font-size: 1.75em;
+  cursor: pointer;
+}
+
+#fab:active {
+  transform: scale(0.95);
+}
+
+#page-header {
+  position: fixed;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  height: 60px;
+  width: 100vw;
+  background-color: #373838;
+  /* background-image: url("../assets/homeBcg.png"); */
+  box-shadow: 0 -3px 8px 5px #3f3f3f;
+}
+
+#page-header #hamburger {
+  position: relative;
+  display: block;
+  top: 15px;
+  left: 15px;
+  height: 30px;
+  width: 30px;
+}
+
+#page-header #hamburger .line {
+  position: absolute;
+  display: block;
+  left: 5px;
+  height: 2px;
+  background-color: white;
+}
+
+#page-header #hamburger .line:first-of-type {
+  transform: translateY(8px);
+  width: 20px;
+}
+
+#page-header #hamburger .line:nth-of-type(2) {
+  transform: translateY(15px);
+  width: 18px;
+}
+
+#page-header #hamburger .line:last-of-type {
+  transform: translateY(22px);
+  width: 16px;
+}
+
+#page-header #hamburger:active .line:first-of-type {
+  transform: translateY(10px);
+}
+
+#page-header #hamburger:active .line:last-of-type {
+  transform: translateY(20px);
+}
+
+#sidebar-nav {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  height: 100vh;
+  width: 400px;
+  left: 0px;
+  /*background-color: #e51616;*/
+  background-image: url("https://img1.imgtp.com/2023/07/14/IS1PLTb7.gif");
+  box-shadow: 0 0 0 0 #353434;
+  transform: translateX(-400px);
+  transition: transform 0.5s ease-in-out;
+}
+
+#sidebar-nav #sidebar-header {
+  position: relative;
+  height: 200px;
+  width: 100%;
+  background-color: #0d92a3;
+  background-image: url("https://img1.imgtp.com/2023/07/14/ElsGlvKZ.gif");
+  background-size: cover;
+}
+
+#sidebar-nav #sidebar-header #codepen-link {
+  position: relative;
+  display: block;
+  top: 30px;
+  left: 30px;
+  height: 80px;
+  width: 80px;
+  z-index: 10;
+  border-radius: 50%;
+  box-sizing: border-box;
+  background-image: url("https://s3-us-west-2.amazonaws.com/s.cdpn.io/544318/logo.jpg");
+  background-position: center center;
+  background-size: cover;
+  opacity: 0.6;
+  transition: all 0.25s;
+}
+
+#sidebar-nav #sidebar-header #codepen-link:hover {
+  opacity: 1;
+  box-shadow: 0 2px 6px #0f0f0f;
+}
+
+#sidebar-nav #sidebar-header #profile-info {
+  position: relative;
+  top: 15px;
+  padding: 30px;
+}
+
+#sidebar-nav #sidebar-header #profile-info #profile-name {
+  font-size: 1.5em;
+  margin-bottom: 5px;
+}
+
+#sidebar-nav #sidebar-header #btn-more {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  padding: 5px;
+  cursor: pointer;
+}
+
+#sidebar-nav #sidebar-header #btn-more .dot {
+  display: block;
+  height: 4px;
+  width: 4px;
+  border-radius: 50%;
+  margin-bottom: 5px;
+  background-color: white;
+}
+
+#sidebar-nav #sidebar-nav-list {
+  position: relative;
+  /* background-color: #0e0101; */
+  background: rgba(29, 2, 2, 0.5);
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item {
+  position: relative;
+  z-index: 4;
+  box-shadow: 0 2px 4px transparent;
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: all 0.25s ease-in-out;
+  -webkit-animation-fill-mode: forwards;
+  animation-fill-mode: forwards;
+  background-color: #2b2828;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item a {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px 0 20px 30px;
+  color: #bcdef4fd;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item a .material-icons {
+  padding: 0 8px 2px 0;
+  color: #f55e22;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item:hover {
+  z-index: 5;
+  background-color: rgb(129, 126, 126);
+  box-shadow: 0 2px 4px #6f6f6f;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item:nth-child(1) {
+  -webkit-animation-delay: 0.05s;
+  animation-delay: 0.05s;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item:nth-child(2) {
+  -webkit-animation-delay: 0.1s;
+  animation-delay: 0.1s;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item:nth-child(3) {
+  -webkit-animation-delay: 0.15s;
+  animation-delay: 0.15s;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item:nth-child(4) {
+  -webkit-animation-delay: 0.2s;
+  animation-delay: 0.2s;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item:nth-child(5) {
+  -webkit-animation-delay: 0.25s;
+  animation-delay: 0.25s;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item:nth-child(6) {
+  -webkit-animation-delay: 0.3s;
+  animation-delay: 0.3s;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item:nth-child(7) {
+  -webkit-animation-delay: 0.35s;
+  animation-delay: 0.35s;
+}
+
+#sidebar-nav #sidebar-nav-list .sidebar-nav-item:nth-child(8) {
+  -webkit-animation-delay: 0.4s;
+  animation-delay: 0.4s;
+}
+
+#sidebar-nav:target {
+  transform: translateX(0px);
+  box-shadow: -4px 0 12px 6px #3f3f3f;
+}
+
+#sidebar-nav:target .sidebar-nav-item {
+  -webkit-animation: nav-item-fade-in 1s ease-in-out;
+  animation: nav-item-fade-in 1s ease-in-out;
+}
+
+#sidebar-nav:target+#nav-screen-overlay {
+  display: block;
+  pointer-events: auto;
+  opacity: 0.3;
+}
+
+#nav-screen-overlay {
+  position: fixed;
+  z-index: 2;
+  height: 100vh;
+  width: 100vw;
+  background-color: #0f0f0f;
+  opacity: 0;
+  cursor: default;
+  pointer-events: none;
+  transition: opacity 0.5s ease-in-out;
+}
+
+@-webkit-keyframes nav-item-fade-in {
+  to {
+    opacity: 1;
+    transform: translateX(0px);
+  }
+}
+
+@keyframes nav-item-fade-in {
+  to {
+    opacity: 1;
+    transform: translateX(0px);
+  }
+}
+
+/* 音乐按钮 */
+.music-button {
+  position: fixed;
+  z-index: 1;
+  right: 30px;
+  bottom: 30px;
+  height: 60px;
+  width: 60px;
+  border-radius: 50%;
+  background-color: #817f7e;
+  box-shadow: 0 2px 8px #3f3f3f;
+  text-align: center;
+  line-height: 60px;
+  font-size: 1.75em;
+  cursor: pointer;
+}
+
+.music-button.playing {
+  background-color: #7d7f7f;
+}
+
+.music-button:active {
+  transform: scale(0.95);
+}
+
+.music-button i {
+  font-size: 0.7em;
+}
+</style>
